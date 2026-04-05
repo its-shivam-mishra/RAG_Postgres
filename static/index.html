@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Context RAG</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/style.css">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i data-feather="database" class="logo-icon"></i>
+                <h2>Docura RAG</h2>
+            </div>
+            
+            <div class="upload-section">
+                <h3>Knowledge Base</h3>
+                <p class="subtitle">Upload documents to build your context</p>
+                
+                <div class="upload-area" id="upload-area">
+                    <i data-feather="upload-cloud" class="upload-icon"></i>
+                    <p>Drag & drop or click to upload</p>
+                    <span class="file-types">Supported: PDF, TXT</span>
+                    <input type="file" id="file-input" accept=".pdf,.txt" hidden>
+                </div>
+                
+                <div id="upload-status" class="upload-status"></div>
+                
+                <div class="indexed-files">
+                    <h4>Recently Ingested</h4>
+                    <ul id="file-list">
+                        <!-- Uploaded files will appear here -->
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <header class="chat-header">
+                <div>
+                    <h2>Knowledge Assistant</h2>
+                    <p class="status-indicator"><span class="dot"></span> Online and ready</p>
+                </div>
+                <button class="icon-btn" title="Settings"><i data-feather="settings"></i></button>
+            </header>
+            
+            <div class="chat-history" id="chat-history">
+                <div class="message ai-message">
+                    <div class="avatar"><i data-feather="cpu"></i></div>
+                    <div class="message-content">
+                        Hello! I'm your AI assistant. Upload some documents on the left, and ask me any questions based on that context!
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-input-container">
+                <form id="chat-form" class="chat-input-wrapper">
+                    <input type="text" id="query-input" placeholder="Ask a question about your documents..." autocomplete="off">
+                    <button type="submit" id="send-btn" class="send-btn">
+                        <i data-feather="send"></i>
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="static/script.js"></script>
+    <script>
+        feather.replace();
+    </script>
+</body>
+</html>
