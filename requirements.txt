@@ -10,3 +10,6 @@ pgvector
 pymupdf
 python-dotenv
 sqlalchemy
+authlib
+itsdangerous
+httpx

@@ -1,4 +1,23 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check Authentication First
+    try {
+        const authResponse = await fetch('/api/auth/me', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (authResponse.ok) {
+            const data = await authResponse.json();
+            document.getElementById('login-overlay').style.display = 'none';
+            if (document.getElementById('user-info')) {
+                document.getElementById('user-info').textContent = data.user.name || data.user.email || 'Authed User';
+            }
+        } else {
+            // Leave the login overlay visible
+        }
+    } catch (error) {
+        console.error("Auth check failed", error);
+    }
+    
     const uploadArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('file-input');
     const uploadStatus = document.getElementById('upload-status');

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,28 +9,42 @@
     <link rel="stylesheet" href="static/style.css">
     <script src="https://unpkg.com/feather-icons"></script>
 </head>
+
 <body>
     <div class="app-container">
         <!-- Sidebar -->
+        <div id="login-overlay"
+            style="display: flex; position: absolute; top:0; left:0; width:100%; height:100%; background: var(--bg-dark); z-index: 1000; align-items: center; justify-content: center; flex-direction: column;">
+            <h2>Docura RAG Authentication</h2>
+            <p style="margin-bottom: 20px; color: var(--text-secondary);">Please sign in with your corporate account to
+                continue.</p>
+            <button onclick="window.location.href='/api/auth/login'"
+                style="background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                Sign in with Microsoft
+            </button>
+        </div>
+
+
+
         <aside class="sidebar">
             <div class="sidebar-header">
                 <i data-feather="database" class="logo-icon"></i>
                 <h2>Docura RAG</h2>
             </div>
-            
+
             <div class="upload-section">
                 <h3>Knowledge Base</h3>
                 <p class="subtitle">Upload documents to build your context</p>
-                
+
                 <div class="upload-area" id="upload-area">
                     <i data-feather="upload-cloud" class="upload-icon"></i>
                     <p>Drag & drop or click to upload</p>
                     <span class="file-types">Supported: PDF, TXT</span>
                     <input type="file" id="file-input" accept=".pdf,.txt" hidden>
                 </div>
-                
+
                 <div id="upload-status" class="upload-status"></div>
-                
+
                 <div class="indexed-files">
                     <h4>Recently Ingested</h4>
                     <ul id="file-list">
@@ -46,21 +61,27 @@
                     <h2>Knowledge Assistant</h2>
                     <p class="status-indicator"><span class="dot"></span> Online and ready</p>
                 </div>
-                <button class="icon-btn" title="Settings"><i data-feather="settings"></i></button>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span id="user-info" style="font-size: 14px; color: var(--text-secondary);"></span>
+                    <button onclick="window.location.href='/api/auth/logout'" class="icon-btn" title="Logout"><i data-feather="log-out"></i></button>
+                    <button class="icon-btn" title="Settings"><i data-feather="settings"></i></button>
+                </div>
             </header>
-            
+
             <div class="chat-history" id="chat-history">
                 <div class="message ai-message">
                     <div class="avatar"><i data-feather="cpu"></i></div>
                     <div class="message-content">
-                        Hello! I'm your AI assistant. Upload some documents on the left, and ask me any questions based on that context!
+                        Hello! I'm your AI assistant. Upload some documents on the left, and ask me any questions based
+                        on that context!
                     </div>
                 </div>
             </div>
-            
+
             <div class="chat-input-container">
                 <form id="chat-form" class="chat-input-wrapper">
-                    <input type="text" id="query-input" placeholder="Ask a question about your documents..." autocomplete="off">
+                    <input type="text" id="query-input" placeholder="Ask a question about your documents..."
+                        autocomplete="off">
                     <button type="submit" id="send-btn" class="send-btn">
                         <i data-feather="send"></i>
                     </button>
@@ -74,4 +95,5 @@
         feather.replace();
     </script>
 </body>
+
 </html>
