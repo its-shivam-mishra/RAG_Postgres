@@ -25,9 +25,17 @@ try:
     with psycopg.connect(connection_string_original) as conn:
         with conn.cursor() as cur:
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_documents (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                UNIQUE(user_id, filename)
+            );
+            """)
             conn.commit()
 except Exception as e:
-    print(f"Warning: Could not create extension automatically: {e}")
+    print(f"Warning: Could not create database schema automatically: {e}")
 
 embeddings = AzureOpenAIEmbeddings(
     azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small"),
@@ -54,7 +62,7 @@ def get_vector_store():
         use_jsonb=True,
     )
 
-def process_and_store_document(file_path: str, filename: str):
+def process_and_store_document(file_path: str, filename: str, user_id: str):
     # Load document
     if file_path.lower().endswith(".pdf"):
         loader = PyMuPDFLoader(file_path)
@@ -65,6 +73,7 @@ def process_and_store_document(file_path: str, filename: str):
     
     for doc in docs:
         doc.metadata["source"] = filename
+        doc.metadata["user_id"] = user_id
     
     # Split lengths
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -76,9 +85,14 @@ def process_and_store_document(file_path: str, filename: str):
     
     return len(splits)
 
-def query_rag(question: str):
+def query_rag(question: str, user_id: str, filename: str = None):
     vector_store = get_vector_store()
-    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+    
+    filter_dict = {"user_id": user_id}
+    if filename:
+        filter_dict["source"] = filename
+        
+    retriever = vector_store.as_retriever(search_kwargs={"k": 5, "filter": filter_dict})
     
     system_prompt = (
         "You are an assistant for question-answering tasks. "

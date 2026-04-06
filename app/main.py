@@ -39,7 +39,11 @@ async def login(request: Request):
 @app.get("/api/auth/callback", name="auth_callback")
 async def auth_callback(request: Request):
     try:
-        token = await oauth.azure.authorize_access_token(request)
+       # token = await oauth.azure.authorize_access_token(request)
+        token = await oauth.azure.authorize_access_token(
+            request, 
+            claims_options={} 
+        )
         user = token.get('userinfo')
         if user:
             request.session['user'] = user
@@ -59,9 +63,9 @@ async def logout(request: Request):
     
     # Optional: Federated Logout to force Microsoft to clear its cookies too
     tenant_id = os.getenv("AZURE_TENANT_ID", "common")
-    azure_logout_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout?post_logout_redirect_uri=http://localhost:8000/"
+    #azure_logout_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout?post_logout_redirect_uri=http://localhost:8000/"
     
-    return RedirectResponse(url=azure_logout_url)
+    return RedirectResponse(url="/")
 
 # Mount the static folder at the root
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -73,9 +77,28 @@ async def read_root():
 
 class QueryRequest(BaseModel):
     question: str
+    filename: str = None
+
+@app.get("/api/documents")
+async def get_documents(user: dict = Depends(get_current_user)):
+    user_id = user.get('preferred_username') or user.get('email') or user.get('oid') or "unknown_user"
+    from app.rag_engine import connection_string_original
+    import psycopg
+    try:
+        with psycopg.connect(connection_string_original) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT filename FROM user_documents WHERE user_id = %s ORDER BY id DESC;", (user_id,))
+                rows = cur.fetchall()
+                docs = [row[0] for row in rows]
+                return {"documents": docs}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    user_id = user.get('preferred_username') or user.get('email') or user.get('oid') or "unknown_user"
     if not (file.filename.endswith(".pdf") or file.filename.endswith(".txt")):
         raise HTTPException(status_code=400, detail="Only PDF and TXT files are allowed.")
     
@@ -86,7 +109,21 @@ async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_cur
         shutil.copyfileobj(file.file, buffer)
         
     try:
-        chunks_indexed = process_and_store_document(file_path, file.filename)
+        chunks_indexed = process_and_store_document(file_path, file.filename, user_id)
+        
+        from app.rag_engine import connection_string_original
+        import psycopg
+        try:
+            with psycopg.connect(connection_string_original) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO user_documents (user_id, filename) VALUES (%s, %s) ON CONFLICT (user_id, filename) DO NOTHING;",
+                        (user_id, file.filename)
+                    )
+                    conn.commit()
+        except Exception as db_e:
+            print(f"Failed to record user document: {db_e}")
+
         return {"filename": file.filename, "message": "File processed successfully", "chunks": chunks_indexed}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -96,8 +133,9 @@ async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_cur
 
 @app.post("/api/query")
 async def query_endpoint(request: QueryRequest, user: dict = Depends(get_current_user)):
+    user_id = user.get('preferred_username') or user.get('email') or user.get('oid') or "unknown_user"
     try:
-        answer, sources = query_rag(request.question)
+        answer, sources = query_rag(request.question, user_id, request.filename)
         return {"answer": answer, "sources": sources}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

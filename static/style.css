@@ -42,6 +42,15 @@ body {
     padding: 24px;
 }
 
+.right-sidebar {
+    width: 320px;
+    background-color: var(--bg-sidebar);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+}
+
 .sidebar-header {
     display: flex;
     align-items: center;
@@ -125,17 +134,32 @@ body {
 
 #file-list li {
     font-size: 13px;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: rgba(255,255,255,0.03);
-    border-radius: 6px;
+    border-radius: 8px;
     margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+#file-list li:hover {
+    background: rgba(255,255,255,0.06);
+    transform: translateY(-1px);
+}
+
+#file-list li.active {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--primary);
+    color: var(--text-primary);
+    font-weight: 500;
 }
 
 #file-list li::before {
-    content: "•";
+    content: "\\2022";
     color: var(--primary);
 }
 

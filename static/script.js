@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (document.getElementById('user-info')) {
                 document.getElementById('user-info').textContent = data.user.name || data.user.email || 'Authed User';
             }
+            fetchDocuments();
         } else {
             // Leave the login overlay visible
         }
@@ -25,6 +26,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const chatForm = document.getElementById('chat-form');
     const queryInput = document.getElementById('query-input');
     const chatHistory = document.getElementById('chat-history');
+    
+    let activeDocument = null;
+
+    async function fetchDocuments() {
+        try {
+            const resp = await fetch('/api/documents');
+            if (resp.ok) {
+                const data = await resp.json();
+                fileList.innerHTML = '';
+                data.documents.forEach(doc => addToFileList(doc));
+            }
+        } catch (e) {
+            console.error("Failed to fetch documents", e);
+        }
+    }
 
     // Handle Drag & Drop
     uploadArea.addEventListener('click', () => fileInput.click());
@@ -92,9 +108,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function addToFileList(filename) {
+        const existing = Array.from(fileList.children).find(li => li.dataset.filename === filename);
+        if (existing) return;
+
         const li = document.createElement('li');
         li.textContent = filename;
+        li.dataset.filename = filename;
+        
+        li.addEventListener('click', () => {
+            Array.from(fileList.children).forEach(child => child.classList.remove('active'));
+            li.classList.add('active');
+            activeDocument = filename;
+        });
+
         fileList.appendChild(li);
+        
+        // Auto-select if first document
+        if (!activeDocument) {
+            li.click();
+        }
     }
 
     // Chat functionality
@@ -115,7 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await fetch('/api/query', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question })
+                body: JSON.stringify({ question, filename: activeDocument })
             });
 
             const data = await response.json();
