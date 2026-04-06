@@ -30,7 +30,7 @@ async def get_current_user(request: Request):
 
 @app.get("/api/auth/login")
 async def login(request: Request):
-    # This must match the redirect URI added in Azure Portal
+    # #This must match the redirect URI added in Azure Portal
     redirect_uri = str(request.url_for('auth_callback'))
     # Azure explicitly blocks 127.0.0.1 for Web platforms, so we force it to localhost
     redirect_uri = redirect_uri.replace("127.0.0.1", "localhost")
