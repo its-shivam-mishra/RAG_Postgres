@@ -1,94 +1,71 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
+"""
+main.py
+-------
+FastAPI application entry point.
+
+Responsibilities
+----------------
+  - Create the FastAPI app instance.
+  - Register middleware (session).
+  - Mount static files.
+  - Include all routers (auth, documents, query).
+  - Initialise the database at startup.
+  - Serve the SPA root.
+"""
+
+import logging
+import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
-import os
-import shutil
 
-from app.rag_engine import process_and_store_document, query_rag
-from app.auth import router as auth_router, get_current_user
+from app.config import SESSION_SECRET_KEY
+from app.database import init_db
+from app.auth import router as auth_router
+from app.routes.documents import router as documents_router
+from app.routes.query import router as query_router
 
-app = FastAPI(title="RAG Application")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET_KEY", "super-secret-key-123"))
+# ── App factory ───────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="RAG Application",
+    description="Document Q&A powered by Azure OpenAI + pgvector + Tavily Search",
+    version="2.0.0",
+)
 
+# ── Middleware ────────────────────────────────────────────────────────────────
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
+
+# ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
+app.include_router(documents_router)
+app.include_router(query_router)
 
-# Mount the static folder at the root
+# ── Static files ──────────────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+# ── Startup ───────────────────────────────────────────────────────────────────
+@app.on_event("startup")
+async def on_startup():
+    logger.info("Initialising database schema…")
+    init_db()
+    logger.info("Application ready.")
+
+
+# ── SPA root ──────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
     with open("static/index.html", "r", encoding="utf-8") as f:
         return f.read()
 
-class QueryRequest(BaseModel):
-    question: str
-    filename: str = None
 
-@app.get("/api/documents")
-async def get_documents(user: dict = Depends(get_current_user)):
-    user_id = user.get('preferred_username') or user.get('email') or user.get('oid') or "unknown_user"
-    from app.rag_engine import connection_string_original
-    import psycopg
-    try:
-        with psycopg.connect(connection_string_original) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT filename FROM user_documents WHERE user_id = %s ORDER BY id DESC;", (user_id,))
-                rows = cur.fetchall()
-                docs = [row[0] for row in rows]
-                return {"documents": docs}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
-    user_id = user.get('preferred_username') or user.get('email') or user.get('oid') or "unknown_user"
-    if not (file.filename.endswith(".pdf") or file.filename.endswith(".txt")):
-        raise HTTPException(status_code=400, detail="Only PDF and TXT files are allowed.")
-    
-    os.makedirs("temp_uploads", exist_ok=True)
-    file_path = os.path.join("temp_uploads", file.filename)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    try:
-        chunks_indexed = process_and_store_document(file_path, file.filename, user_id)
-        
-        from app.rag_engine import connection_string_original
-        import psycopg
-        try:
-            with psycopg.connect(connection_string_original) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "INSERT INTO user_documents (user_id, filename) VALUES (%s, %s) ON CONFLICT (user_id, filename) DO NOTHING;",
-                        (user_id, file.filename)
-                    )
-                    conn.commit()
-        except Exception as db_e:
-            print(f"Failed to record user document: {db_e}")
-
-        return {"filename": file.filename, "message": "File processed successfully", "chunks": chunks_indexed}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
-@app.post("/api/query")
-async def query_endpoint(request: QueryRequest, user: dict = Depends(get_current_user)):
-    user_id = user.get('preferred_username') or user.get('email') or user.get('oid') or "unknown_user"
-    try:
-        answer, sources = query_rag(request.question, user_id, request.filename)
-        return {"answer": answer, "sources": sources}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+# ── Dev runner ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    import uvicorn
-    # When running the file directly, start the Uvicorn server automatically
     uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

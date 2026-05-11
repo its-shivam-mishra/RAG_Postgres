@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             removeMessage(typingId);
 
             if (response.ok) {
-                appendMessage('ai', data.answer, data.sources);
+                appendMessage('ai', data.answer, data.sources, data.source_type);
             } else {
                 appendMessage('ai', `Error: ${data.detail || 'Failed to get answer'}`);
             }
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    function appendMessage(role, content, sources = null) {
+    function appendMessage(role, content, sources = null, sourceType = null) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role}-message`;
 
@@ -174,7 +174,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
-        contentDiv.textContent = content;
+
+        // Source-origin badge (only for AI messages)
+        if (role === 'ai' && sourceType) {
+            const originBadge = document.createElement('span');
+            if (sourceType === 'tavily') {
+                originBadge.className = 'source-origin-badge source-origin-web';
+                originBadge.innerHTML = '<i data-feather="globe"></i> Web Search';
+            } else {
+                originBadge.className = 'source-origin-badge source-origin-rag';
+                originBadge.innerHTML = '<i data-feather="book-open"></i> RAG Docs';
+            }
+            contentDiv.appendChild(originBadge);
+        }
+
+        const textNode = document.createElement('p');
+        textNode.className = 'message-text';
+        textNode.textContent = content;
+        contentDiv.appendChild(textNode);
 
         if (sources && sources.length > 0) {
             const sourcesDiv = document.createElement('div');
@@ -184,7 +201,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             sources.forEach(src => {
                 const badge = document.createElement('span');
                 badge.className = 'sources-badge';
-                badge.textContent = src;
+                // If it looks like a URL (Tavily), make it a link
+                if (src.startsWith('http')) {
+                    const link = document.createElement('a');
+                    link.href = src;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = new URL(src).hostname;
+                    badge.appendChild(link);
+                } else {
+                    badge.textContent = src;
+                }
                 sourcesDiv.appendChild(badge);
             });
             

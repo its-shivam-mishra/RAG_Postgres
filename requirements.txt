@@ -13,3 +13,5 @@ sqlalchemy
 authlib
 itsdangerous
 httpx
+flashrank
+tavily-python

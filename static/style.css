@@ -397,3 +397,48 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255,255,255,0.2);
 }
+
+/* Source-origin badge (RAG vs Web Search) */
+.source-origin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+}
+
+.source-origin-badge svg {
+    width: 12px;
+    height: 12px;
+}
+
+.source-origin-rag {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.source-origin-web {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.message-text {
+    margin: 0;
+}
+
+/* Tavily URL links inside source badges */
+.sources-badge a {
+    color: #60a5fa;
+    text-decoration: none;
+}
+
+.sources-badge a:hover {
+    text-decoration: underline;
+}

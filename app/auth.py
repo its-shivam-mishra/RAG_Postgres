@@ -1,59 +1,92 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+"""
+auth.py
+-------
+Azure AD / Microsoft SSO via OAuth 2.0 (OpenID Connect).
+
+Routes
+------
+  GET /api/auth/login     — redirect to Microsoft login
+  GET /api/auth/callback  — handle the token exchange after login
+  GET /api/auth/me        — return the current user's profile
+  GET /api/auth/logout    — clear the session and redirect to home
+"""
+
+import logging
+import traceback
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuth
-import os
+
+from app.config import AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+# ── OAuth client setup ────────────────────────────────────────────────────────
 oauth = OAuth()
 oauth.register(
-    name='azure',
-    client_id=os.getenv("AZURE_CLIENT_ID", "dummy_client_id"),
-    client_secret=os.getenv("AZURE_CLIENT_SECRET", "dummy_secret"),
-    server_metadata_url=f'https://login.microsoftonline.com/{os.getenv("AZURE_TENANT_ID", "common")}/v2.0/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid profile email User.Read'},
+    name="azure",
+    client_id=AZURE_CLIENT_ID,
+    client_secret=AZURE_CLIENT_SECRET,
+    server_metadata_url=(
+        f"https://login.microsoftonline.com/{AZURE_TENANT_ID}"
+        "/v2.0/.well-known/openid-configuration"
+    ),
+    client_kwargs={"scope": "openid profile email User.Read"},
 )
 
-async def get_current_user(request: Request):
-    user = request.session.get('user')
+
+# ── Dependency ────────────────────────────────────────────────────────────────
+async def get_current_user(request: Request) -> dict:
+    """FastAPI dependency — raises 401 if the user is not authenticated."""
+    user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user
 
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 @router.get("/login")
 async def login(request: Request):
-    # This must match the redirect URI added in Azure Portal
-    redirect_uri = str(request.url_for('auth_callback'))
-    # Azure explicitly blocks 127.0.0.1 for Web platforms, so we force it to localhost
-    redirect_uri = redirect_uri.replace("127.0.0.1", "localhost")
+    """Initiate the Azure AD login flow."""
+    # Redirect 127.0.0.1 → localhost so session cookies survive the round-trip
+    if "127.0.0.1" in request.headers.get("host", ""):
+        return RedirectResponse(
+            url=str(request.url).replace("127.0.0.1", "localhost")
+        )
+    redirect_uri = str(request.url_for("auth_callback"))
     return await oauth.azure.authorize_redirect(request, redirect_uri)
+
 
 @router.get("/callback", name="auth_callback")
 async def auth_callback(request: Request):
+    """Exchange the authorisation code for tokens and store the user session."""
     try:
         token = await oauth.azure.authorize_access_token(
-            request, 
-            claims_options={} 
+            request, claims_options={}
         )
-        user = token.get('userinfo')
+        user = token.get("userinfo")
         if user:
-            request.session['user'] = user
-    except Exception as e:
-        # Instead of failing, just redirect or show error
-        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
-    
+            request.session["user"] = user
+    except Exception as exc:
+        traceback.print_exc()
+        logger.error("OAuth callback failed: %s", exc)
+        raise HTTPException(
+            status_code=400, detail=f"Authentication failed: {exc}"
+        )
     return RedirectResponse(url="/")
+
 
 @router.get("/me")
 async def get_me(user: dict = Depends(get_current_user)):
+    """Return the authenticated user's profile."""
     return {"user": user}
+
 
 @router.get("/logout")
 async def logout(request: Request):
+    """Clear the session and return to the home page."""
     request.session.clear()
-    
-    # Optional: Federated Logout to force Microsoft to clear its cookies too
-    tenant_id = os.getenv("AZURE_TENANT_ID", "common")
-    #azure_logout_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout?post_logout_redirect_uri=http://localhost:8000/"
-    
     return RedirectResponse(url="/")
